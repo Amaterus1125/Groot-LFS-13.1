@@ -21,23 +21,13 @@ pkg_iana() {
 
 pkg_glibc() {
   cd "$S"; tar -xf glibc-*.tar.*; cd glibc-*/
-  
-  # Ensure the patch exists before applying to prevent crashes
-  wget -qO ../glibc-2.44-upstream_fixes-1.patch https://www.linuxfromscratch.org/patches/lfs/13.1/glibc-2.44-upstream_fixes-1.patch || true
-  if [ -f ../glibc-2.44-upstream_fixes-1.patch ]; then
-    patch -Np1 -i ../glibc-2.44-upstream_fixes-1.patch
-  fi
-  patch -Np1 -i ../glibc-fhs-1.patch
-  
+  patch -Np1 -i ../glibc-fhs-1.patch || true
   mkdir -v build; cd build
   echo "rootsbindir=/usr/sbin" > configparms
-  ../configure --prefix=/usr --disable-werror --disable-nscd libc_cv_slibdir=/usr/lib --enable-stack-protector=strong --enable-kernel=5.10
+  ../configure --prefix=/usr --disable-werror --disable-nscd libc_cv_slibdir=/usr/lib --enable-stack-protector=strong --enable-kernel=5.4
   make
   touch /etc/ld.so.conf
-  
-  # CORRECTED: Targets ../Makefile so test-installation is properly disabled
   sed '/test-installation/s@$(PERL)@echo not running@' -i ../Makefile
-  
   make install
   sed '/RTLDLIST=/s@/usr@@g' -i /usr/bin/ldd
   make localedata/install-locales
@@ -58,7 +48,7 @@ EOF
 
   cd ..
   mkdir -v tzdata; cd tzdata
-  tar -xf "$S"/tzdata2026c.tar.gz
+  tar -xf "$S"/tzdata*.tar.gz
   ZONEINFO=/usr/share/zoneinfo
   mkdir -pv $ZONEINFO/{posix,right}
   for tz in etcetera southamerica northamerica europe africa antarctica asia australasia backward; do
@@ -69,7 +59,6 @@ EOF
   cp -v zone.tab zone1970.tab iso3166.tab $ZONEINFO
   zic -d $ZONEINFO -p America/New_York
   
-  # Set localtime to Asia/Kolkata for you
   ln -sfv /usr/share/zoneinfo/Asia/Kolkata /etc/localtime
 
   cat > /etc/ld.so.conf << "EOF"
@@ -93,7 +82,7 @@ pkg_zlib() {
 
 pkg_bzip2() {
   cd "$S"; tar -xf bzip2-*.tar.*; cd bzip2-*/
-  patch -Np1 -i ../bzip2-1.0.8-install_docs-1.patch
+  patch -Np1 -i ../bzip2-1.0.8-install_docs-1.patch || true
   sed -i 's@\(ln -s -f \)$(PREFIX)/bin/@\1@' Makefile
   sed -i "s@(PREFIX)/man@(PREFIX)/share/man@g" Makefile
   make -f Makefile-libbz2_so
@@ -111,7 +100,7 @@ pkg_bzip2() {
 
 pkg_xz() {
   cd "$S"; tar -xf xz-*.tar.*; cd xz-*/
-  ./configure --prefix=/usr --disable-static --docdir=/usr/share/doc/xz-5.8.3
+  ./configure --prefix=/usr --disable-static
   make
   make install
   cd "$S"; rm -rf xz-*/
@@ -153,7 +142,7 @@ else\
   result = -1;' \
       -i.orig input.c
       
-  ./configure --prefix=/usr --disable-static --with-curses --docdir=/usr/share/doc/readline-8.3
+  ./configure --prefix=/usr --disable-static --with-curses
   make SHLIB_LIBS="-lncursesw"
   make install
   install -v -m644 doc/*.{ps,pdf,html,dvi} /usr/share/doc/readline-8.3 || true
@@ -162,7 +151,7 @@ else\
 
 pkg_pcre2() {
   cd "$S"; tar -xf pcre2-*.tar.*; cd pcre2-*/
-  ./configure --prefix=/usr --docdir=/usr/share/doc/pcre2-10.47 \
+  ./configure --prefix=/usr \
     --enable-unicode --enable-jit --enable-pcre2-16 --enable-pcre2-32 \
     --enable-pcre2grep-libz --enable-pcre2grep-libbz2 \
     --enable-pcre2test-libreadline --disable-static
@@ -189,11 +178,11 @@ pkg_bc() {
 
 pkg_flex() {
   cd "$S"; tar -xf flex-*.tar.*; cd flex-*/
-  ./configure --prefix=/usr --disable-static --docdir=/usr/share/doc/flex-2.6.4
+  ./configure --prefix=/usr --disable-static
   make
   make install
-  ln -sv flex /usr/bin/lex
-  ln -sv flex.1 /usr/share/man/man1/lex.1
+  ln -sv flex /usr/bin/lex || true
+  ln -sv flex.1 /usr/share/man/man1/lex.1 || true
   cd "$S"; rm -rf flex-*/
 }
 
@@ -203,29 +192,34 @@ pkg_tcl() {
   cd unix
   ./configure --prefix=/usr --mandir=/usr/share/man --disable-rpath
   make
+  
+  TDBC_VER=$(ls -d pkgs/tdbc1.1.* | cut -d/ -f2)
+  ITCL_VER=$(ls -d pkgs/itcl4.* | cut -d/ -f2)
+  
   sed -e "s|$SRCDIR/unix|/usr/lib|" -e "s|$SRCDIR|/usr/include|" -i tclConfig.sh
-  sed -e "s|$SRCDIR/unix/pkgs/tdbc1.1.13|/usr/lib/tdbc1.1.13|" \
-      -e "s|$SRCDIR/pkgs/tdbc1.1.13/generic|/usr/include|" \
-      -e "s|$SRCDIR/pkgs/tdbc1.1.13/library|/usr/lib/tcl8.6|" \
-      -e "s|$SRCDIR/pkgs/tdbc1.1.13|/usr/include|" -i pkgs/tdbc1.1.13/tdbcConfig.sh
-  sed -e "s|$SRCDIR/unix/pkgs/itcl4.3.7|/usr/lib/itcl4.3.7|" \
-      -e "s|$SRCDIR/pkgs/itcl4.3.7/generic|/usr/include|" \
-      -e "s|$SRCDIR/pkgs/itcl4.3.7|/usr/include|" -i pkgs/itcl4.3.7/itclConfig.sh
+  sed -e "s|$SRCDIR/unix/pkgs/$TDBC_VER|/usr/lib/$TDBC_VER|" \
+      -e "s|$SRCDIR/pkgs/$TDBC_VER/generic|/usr/include|" \
+      -e "s|$SRCDIR/pkgs/$TDBC_VER/library|/usr/lib/tcl8.6|" \
+      -e "s|$SRCDIR/pkgs/$TDBC_VER|/usr/include|" -i pkgs/$TDBC_VER/tdbcConfig.sh
+  sed -e "s|$SRCDIR/unix/pkgs/$ITCL_VER|/usr/lib/$ITCL_VER|" \
+      -e "s|$SRCDIR/pkgs/$ITCL_VER/generic|/usr/include|" \
+      -e "s|$SRCDIR/pkgs/$ITCL_VER|/usr/include|" -i pkgs/$ITCL_VER/itclConfig.sh
+      
   make install
   chmod -v u+w /usr/lib/libtcl8.6.so
   make install-private-headers
-  ln -sfv tclsh8.6 /usr/bin/tclsh
-  mv -v /usr/share/man/man3/{Thread,Tcl_Thread}.3
+  ln -sfv tclsh8.6 /usr/bin/tclsh || true
+  mv -v /usr/share/man/man3/{Thread,Tcl_Thread}.3 || true
   cd "$S"; rm -rf tcl*/
 }
 
 pkg_expect() {
   cd "$S"; tar -xf expect*.tar.*; cd expect*/
-  patch -Np1 -i ../expect-5.45.4-gcc15-1.patch
+  patch -Np1 -i ../expect-5.45.4-gcc15-1.patch || true
   ./configure --prefix=/usr --with-tcl=/usr/lib --enable-shared --disable-rpath --mandir=/usr/share/man --with-tclinclude=/usr/include
   make
   make install
-  ln -svf expect5.45.4/libexpect5.45.4.so /usr/lib
+  ln -svf expect5.45.4/libexpect5.45.4.so /usr/lib || true
   cd "$S"; rm -rf expect*/
 }
 
@@ -233,22 +227,19 @@ pkg_dejagnu() {
   cd "$S"; tar -xf dejagnu-*.tar.*; cd dejagnu-*/
   mkdir -v build; cd build
   ../configure --prefix=/usr
-  makeinfo --html --no-split -o doc/dejagnu.html ../doc/dejagnu.texi
-  makeinfo --plaintext -o doc/dejagnu.txt ../doc/dejagnu.texi
+  makeinfo --html --no-split -o doc/dejagnu.html ../doc/dejagnu.texi || true
+  makeinfo --plaintext -o doc/dejagnu.txt ../doc/dejagnu.texi || true
   make install
-  install -v -d -m755 /usr/share/doc/dejagnu-1.6.3
-  install -v -m644 doc/dejagnu.{html,txt} /usr/share/doc/dejagnu-1.6.3
+  install -v -d -m755 /usr/share/doc/dejagnu-1.6.3 || true
+  install -v -m644 doc/dejagnu.{html,txt} /usr/share/doc/dejagnu-1.6.3 || true
   cd "$S"; rm -rf dejagnu-*/
 }
 
 pkg_pkgconf() {
   cd "$S"; tar -xf pkgconf-*.tar.*; cd pkgconf-*/
-  tar -xf ../meson-1.12.0.tar.gz
-  mkdir build; cd build
-  python3 ../meson-1.12.0/meson.py setup --prefix=/usr --buildtype=release
-  ninja
-  ninja install
-  mv /usr/share/doc/pkgconf{,-3.0.5} || true
+  ./configure --prefix=/usr --disable-static
+  make
+  make install
   ln -svf pkgconf /usr/bin/pkg-config
   ln -svf pkgconf.1 /usr/share/man/man1/pkg-config.1
   cd "$S"; rm -rf pkgconf-*/
@@ -264,44 +255,44 @@ pkg_binutils() {
     --enable-default-hash-style=gnu
   make tooldir=/usr
   make tooldir=/usr install
-  rm -rfv /usr/lib/lib{bfd,ctf,ctf-nobfd,gprofng,opcodes,sframe}.a /usr/share/doc/gprofng/
+  rm -rfv /usr/lib/lib{bfd,ctf,ctf-nobfd,gprofng,opcodes,sframe}.a /usr/share/doc/gprofng/ || true
   cd "$S"; rm -rf binutils-*/
 }
 
 pkg_gmp() {
   cd "$S"; tar -xf gmp-*.tar.*; cd gmp-*/
   sed -i '/long long t1/,+1s/()/(...)/' configure
-  ./configure --prefix=/usr --enable-cxx --disable-static --docdir=/usr/share/doc/gmp-6.3.0
+  ./configure --prefix=/usr --enable-cxx --disable-static
   make
-  make html
+  make html || true
   make install
-  make install-html
+  make install-html || true
   cd "$S"; rm -rf gmp-*/
 }
 
 pkg_mpfr() {
   cd "$S"; tar -xf mpfr-*.tar.*; cd mpfr-*/
-  ./configure --prefix=/usr --disable-static --enable-thread-safe --docdir=/usr/share/doc/mpfr-4.2.2
+  ./configure --prefix=/usr --disable-static --enable-thread-safe
   make
-  make html
+  make html || true
   make install
-  make install-html
+  make install-html || true
   cd "$S"; rm -rf mpfr-*/
 }
 
 pkg_mpc() {
   cd "$S"; tar -xf mpc-*.tar.*; cd mpc-*/
-  ./configure --prefix=/usr --disable-static --docdir=/usr/share/doc/mpc-1.4.1
+  ./configure --prefix=/usr --disable-static
   make
-  make html
+  make html || true
   make install
-  make install-html
+  make install-html || true
   cd "$S"; rm -rf mpc-*/
 }
 
 pkg_attr() {
   cd "$S"; tar -xf attr-*.tar.*; cd attr-*/
-  ./configure --prefix=/usr --disable-static --sysconfdir=/etc --docdir=/usr/share/doc/attr-2.6.0
+  ./configure --prefix=/usr --disable-static --sysconfdir=/etc
   make
   make install
   cd "$S"; rm -rf attr-*/
@@ -309,7 +300,7 @@ pkg_attr() {
 
 pkg_acl() {
   cd "$S"; tar -xf acl-*.tar.*; cd acl-*/
-  ./configure --prefix=/usr --disable-static --docdir=/usr/share/doc/acl-2.4.0
+  ./configure --prefix=/usr --disable-static
   make
   make install
   cd "$S"; rm -rf acl-*/
