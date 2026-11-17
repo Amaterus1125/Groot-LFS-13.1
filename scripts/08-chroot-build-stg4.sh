@@ -3,6 +3,7 @@ set -euo pipefail
 export LOGS="/tmp/logs"
 mkdir -p "$LOGS"
 export S="/sources"
+export BLD_TGT="$(uname -m)-unknown-linux-gnu"
 
 # --- Build Functions ---
 
@@ -21,14 +22,13 @@ pkg_iana() {
 
 pkg_glibc() {
   cd "$S"; tar -xf glibc-*.tar.*; cd glibc-*/
-  patch -Np1 -i ../glibc-2.44-upstream_fixes-1.patch
   patch -Np1 -i ../glibc-fhs-1.patch
   mkdir -v build; cd build
   echo "rootsbindir=/usr/sbin" > configparms
-  ../configure --prefix=/usr --disable-werror --disable-nscd libc_cv_slibdir=/usr/lib --enable-stack-protector=strong --enable-kernel=5.10
+  ../configure --prefix=/usr --build=$BLD_TGT --disable-werror --disable-nscd libc_cv_slibdir=/usr/lib --enable-stack-protector=strong --enable-kernel=5.4
   make
   touch /etc/ld.so.conf
-  sed '/test-installation/s@$(PERL)@echo not running@' -i ./Makefile
+  sed '/test-installation/s@$(PERL)@echo not running@' -i ../Makefile
   make install
   sed '/RTLDLIST=/s@/usr@@g' -i /usr/bin/ldd
   make localedata/install-locales
@@ -49,7 +49,7 @@ EOF
 
   cd ..
   mkdir -v tzdata; cd tzdata
-  tar -xf "$S"/tzdata2026c.tar.gz
+  tar -xf "$S"/tzdata2025c.tar.gz
   ZONEINFO=/usr/share/zoneinfo
   mkdir -pv $ZONEINFO/{posix,right}
   for tz in etcetera southamerica northamerica europe africa antarctica asia australasia backward; do
@@ -102,7 +102,7 @@ pkg_bzip2() {
 
 pkg_xz() {
   cd "$S"; tar -xf xz-*.tar.*; cd xz-*/
-  ./configure --prefix=/usr --disable-static --docdir=/usr/share/doc/xz-5.8.3
+  ./configure --prefix=/usr --build=$BLD_TGT --disable-static --docdir=/usr/share/doc/xz-5.8.2
   make
   make install
   cd "$S"; rm -rf xz-*/
@@ -125,7 +125,7 @@ pkg_zstd() {
 
 pkg_file() {
   cd "$S"; tar -xf file-*.tar.*; cd file-*/
-  ./configure --prefix=/usr
+  ./configure --prefix=/usr --build=$BLD_TGT
   make
   make install
   cd "$S"; rm -rf file-*/
@@ -144,7 +144,7 @@ else\
   result = -1;' \
       -i.orig input.c
       
-  ./configure --prefix=/usr --disable-static --with-curses --docdir=/usr/share/doc/readline-8.3
+  ./configure --prefix=/usr --build=$BLD_TGT --disable-static --with-curses --docdir=/usr/share/doc/readline-8.3
   make SHLIB_LIBS="-lncursesw"
   make install
   install -v -m644 doc/*.{ps,pdf,html,dvi} /usr/share/doc/readline-8.3 || true
@@ -153,7 +153,7 @@ else\
 
 pkg_pcre2() {
   cd "$S"; tar -xf pcre2-*.tar.*; cd pcre2-*/
-  ./configure --prefix=/usr --docdir=/usr/share/doc/pcre2-10.47 \
+  ./configure --prefix=/usr --build=$BLD_TGT --docdir=/usr/share/doc/pcre2-10.47 \
     --enable-unicode --enable-jit --enable-pcre2-16 --enable-pcre2-32 \
     --enable-pcre2grep-libz --enable-pcre2grep-libbz2 \
     --enable-pcre2test-libreadline --disable-static
@@ -164,7 +164,7 @@ pkg_pcre2() {
 
 pkg_m4() {
   cd "$S"; tar -xf m4-*.tar.*; cd m4-*/
-  ./configure --prefix=/usr
+  ./configure --prefix=/usr --build=$BLD_TGT
   make
   make install
   cd "$S"; rm -rf m4-*/
@@ -180,7 +180,7 @@ pkg_bc() {
 
 pkg_flex() {
   cd "$S"; tar -xf flex-*.tar.*; cd flex-*/
-  ./configure --prefix=/usr --disable-static --docdir=/usr/share/doc/flex-2.6.4
+  ./configure --prefix=/usr --build=$BLD_TGT --disable-static --docdir=/usr/share/doc/flex-2.6.4
   make
   make install
   ln -sv flex /usr/bin/lex
@@ -192,16 +192,16 @@ pkg_tcl() {
   cd "$S"; tar -xf tcl*-src.tar.*; cd tcl*/
   SRCDIR=$(pwd)
   cd unix
-  ./configure --prefix=/usr --mandir=/usr/share/man --disable-rpath
+  ./configure --prefix=/usr --build=$BLD_TGT --mandir=/usr/share/man --disable-rpath
   make
   sed -e "s|$SRCDIR/unix|/usr/lib|" -e "s|$SRCDIR|/usr/include|" -i tclConfig.sh
-  sed -e "s|$SRCDIR/unix/pkgs/tdbc1.1.13|/usr/lib/tdbc1.1.13|" \
-      -e "s|$SRCDIR/pkgs/tdbc1.1.13/generic|/usr/include|" \
-      -e "s|$SRCDIR/pkgs/tdbc1.1.13/library|/usr/lib/tcl8.6|" \
-      -e "s|$SRCDIR/pkgs/tdbc1.1.13|/usr/include|" -i pkgs/tdbc1.1.13/tdbcConfig.sh
-  sed -e "s|$SRCDIR/unix/pkgs/itcl4.3.7|/usr/lib/itcl4.3.7|" \
-      -e "s|$SRCDIR/pkgs/itcl4.3.7/generic|/usr/include|" \
-      -e "s|$SRCDIR/pkgs/itcl4.3.7|/usr/include|" -i pkgs/itcl4.3.7/itclConfig.sh
+  sed -e "s|$SRCDIR/unix/pkgs/tdbc1.1.12|/usr/lib/tdbc1.1.12|" \
+      -e "s|$SRCDIR/pkgs/tdbc1.1.12/generic|/usr/include|" \
+      -e "s|$SRCDIR/pkgs/tdbc1.1.12/library|/usr/lib/tcl8.6|" \
+      -e "s|$SRCDIR/pkgs/tdbc1.1.12|/usr/include|" -i pkgs/tdbc1.1.12/tdbcConfig.sh
+  sed -e "s|$SRCDIR/unix/pkgs/itcl4.3.4|/usr/lib/itcl4.3.4|" \
+      -e "s|$SRCDIR/pkgs/itcl4.3.4/generic|/usr/include|" \
+      -e "s|$SRCDIR/pkgs/itcl4.3.4|/usr/include|" -i pkgs/itcl4.3.4/itclConfig.sh
   make install
   chmod -v u+w /usr/lib/libtcl8.6.so
   make install-private-headers
@@ -213,7 +213,7 @@ pkg_tcl() {
 pkg_expect() {
   cd "$S"; tar -xf expect*.tar.*; cd expect*/
   patch -Np1 -i ../expect-5.45.4-gcc15-1.patch
-  ./configure --prefix=/usr --with-tcl=/usr/lib --enable-shared --disable-rpath --mandir=/usr/share/man --with-tclinclude=/usr/include
+  ./configure --prefix=/usr --build=$BLD_TGT --with-tcl=/usr/lib --enable-shared --disable-rpath --mandir=/usr/share/man --with-tclinclude=/usr/include
   make
   make install
   ln -svf expect5.45.4/libexpect5.45.4.so /usr/lib
@@ -223,7 +223,7 @@ pkg_expect() {
 pkg_dejagnu() {
   cd "$S"; tar -xf dejagnu-*.tar.*; cd dejagnu-*/
   mkdir -v build; cd build
-  ../configure --prefix=/usr
+  ../configure --prefix=/usr --build=$BLD_TGT
   makeinfo --html --no-split -o doc/dejagnu.html ../doc/dejagnu.texi
   makeinfo --plaintext -o doc/dejagnu.txt ../doc/dejagnu.texi
   make install
@@ -232,35 +232,22 @@ pkg_dejagnu() {
   cd "$S"; rm -rf dejagnu-*/
 }
 
-pkg_ninja() {
-  cd "$S"; tar -xf ninja-*.tar.*; cd ninja-*/
-  python3 configure.py --bootstrap --verbose
-  install -vm755 ninja /usr/bin/
-  install -vDm644 misc/bash-completion /usr/share/bash-completion/completions/ninja
-  install -vDm644 misc/zsh-completion /usr/share/zsh/site-functions/_ninja
-  cd "$S"; rm -rf ninja-*/
-}
-
 pkg_pkgconf() {
   cd "$S"; tar -xf pkgconf-*.tar.*; cd pkgconf-*/
-  tar -xf ../meson-1.12.0.tar.gz
-  mkdir build; cd build
-  python3 ../meson-1.12.0/meson.py setup --prefix=/usr --buildtype=release
-  ninja
-  ninja install
-  mv /usr/share/doc/pkgconf{,-3.0.5} || true
-  ln -svf pkgconf /usr/bin/pkg-config
-  ln -svf pkgconf.1 /usr/share/man/man1/pkg-config.1
+  ./configure --prefix=/usr --build=$BLD_TGT --disable-static --docdir=/usr/share/doc/pkgconf-2.5.1
+  make
+  make install
+  ln -sv pkgconf /usr/bin/pkg-config
+  ln -sv pkgconf.1 /usr/share/man/man1/pkg-config.1
   cd "$S"; rm -rf pkgconf-*/
 }
 
 pkg_binutils() {
   cd "$S"; tar -xf binutils-*.tar.*; cd binutils-*/
   mkdir -v build; cd build
-  ../configure --prefix=/usr --sysconfdir=/etc --enable-ld=default \
+  ../configure --prefix=/usr --build=$BLD_TGT --sysconfdir=/etc --enable-ld=default \
     --enable-plugins --enable-shared --disable-werror \
     --enable-64-bit-bfd --enable-new-dtags --with-system-zlib \
-    --with-lib-path=/usr/lib \
     --enable-default-hash-style=gnu
   make tooldir=/usr
   make tooldir=/usr install
@@ -271,7 +258,7 @@ pkg_binutils() {
 pkg_gmp() {
   cd "$S"; tar -xf gmp-*.tar.*; cd gmp-*/
   sed -i '/long long t1/,+1s/()/(...)/' configure
-  ./configure --prefix=/usr --enable-cxx --disable-static --docdir=/usr/share/doc/gmp-6.3.0
+  ./configure --prefix=/usr --build=$BLD_TGT --enable-cxx --disable-static --docdir=/usr/share/doc/gmp-6.3.0
   make
   make html
   make install
@@ -281,7 +268,7 @@ pkg_gmp() {
 
 pkg_mpfr() {
   cd "$S"; tar -xf mpfr-*.tar.*; cd mpfr-*/
-  ./configure --prefix=/usr --disable-static --enable-thread-safe --docdir=/usr/share/doc/mpfr-4.2.2
+  ./configure --prefix=/usr --build=$BLD_TGT --disable-static --enable-thread-safe --docdir=/usr/share/doc/mpfr-4.2.2
   make
   make html
   make install
@@ -291,7 +278,7 @@ pkg_mpfr() {
 
 pkg_mpc() {
   cd "$S"; tar -xf mpc-*.tar.*; cd mpc-*/
-  ./configure --prefix=/usr --disable-static --docdir=/usr/share/doc/mpc-1.4.1
+  ./configure --prefix=/usr --build=$BLD_TGT --disable-static --docdir=/usr/share/doc/mpc-1.3.1
   make
   make html
   make install
@@ -301,7 +288,7 @@ pkg_mpc() {
 
 pkg_attr() {
   cd "$S"; tar -xf attr-*.tar.*; cd attr-*/
-  ./configure --prefix=/usr --disable-static --sysconfdir=/etc --docdir=/usr/share/doc/attr-2.6.0
+  ./configure --prefix=/usr --build=$BLD_TGT --disable-static --sysconfdir=/etc --docdir=/usr/share/doc/attr-2.5.2
   make
   make install
   cd "$S"; rm -rf attr-*/
@@ -309,13 +296,13 @@ pkg_attr() {
 
 pkg_acl() {
   cd "$S"; tar -xf acl-*.tar.*; cd acl-*/
-  ./configure --prefix=/usr --disable-static --docdir=/usr/share/doc/acl-2.4.0
+  ./configure --prefix=/usr --build=$BLD_TGT --disable-static --docdir=/usr/share/doc/acl-2.3.2
   make
   make install
   cd "$S"; rm -rf acl-*/
 }
 
-export -f pkg_manpages pkg_iana pkg_glibc pkg_zlib pkg_bzip2 pkg_xz pkg_lz4 pkg_zstd pkg_file pkg_readline pkg_pcre2 pkg_m4 pkg_bc pkg_flex pkg_tcl pkg_expect pkg_dejagnu pkg_ninja pkg_pkgconf pkg_binutils pkg_gmp pkg_mpfr pkg_mpc pkg_attr pkg_acl
+export -f pkg_manpages pkg_iana pkg_glibc pkg_zlib pkg_bzip2 pkg_xz pkg_lz4 pkg_zstd pkg_file pkg_readline pkg_pcre2 pkg_m4 pkg_bc pkg_flex pkg_tcl pkg_expect pkg_dejagnu pkg_pkgconf pkg_binutils pkg_gmp pkg_mpfr pkg_mpc pkg_attr pkg_acl
 
 run_pkg() {
   echo "==> Building $1..."
@@ -331,12 +318,13 @@ run_pkg() {
   echo "ok: $1"
 }
 
+# The ordered list of Chapter 8 packages for Stage 4
 FAILED_PKGS=""
-# ninja added before pkgconf per Chapter 8 order
-for p in manpages iana glibc zlib bzip2 xz lz4 zstd file readline pcre2 m4 bc flex tcl expect dejagnu ninja pkgconf binutils gmp mpfr mpc attr acl; do
+for p in manpages iana glibc zlib bzip2 xz lz4 zstd file readline pcre2 m4 bc flex tcl expect dejagnu pkgconf binutils gmp mpfr mpc attr acl; do
   run_pkg "$p" || FAILED_PKGS="$FAILED_PKGS $p"
 done
 
+# Save logs to /sources so we can view them via artifacts
 cp -r $LOGS /sources/chroot-stg4-logs
 if [ -n "$FAILED_PKGS" ]; then
   echo "==> Stage 4 finished WITH FAILURES:$FAILED_PKGS"
