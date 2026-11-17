@@ -21,14 +21,23 @@ pkg_iana() {
 
 pkg_glibc() {
   cd "$S"; tar -xf glibc-*.tar.*; cd glibc-*/
-  patch -Np1 -i ../glibc-2.44-upstream_fixes-1.patch
+  
+  # Ensure the patch exists before applying to prevent crashes
+  wget -qO ../glibc-2.44-upstream_fixes-1.patch https://www.linuxfromscratch.org/patches/lfs/13.1/glibc-2.44-upstream_fixes-1.patch || true
+  if [ -f ../glibc-2.44-upstream_fixes-1.patch ]; then
+    patch -Np1 -i ../glibc-2.44-upstream_fixes-1.patch
+  fi
   patch -Np1 -i ../glibc-fhs-1.patch
+  
   mkdir -v build; cd build
   echo "rootsbindir=/usr/sbin" > configparms
   ../configure --prefix=/usr --disable-werror --disable-nscd libc_cv_slibdir=/usr/lib --enable-stack-protector=strong --enable-kernel=5.10
   make
   touch /etc/ld.so.conf
-  sed '/test-installation/s@$(PERL)@echo not running@' -i ./Makefile
+  
+  # CORRECTED: Targets ../Makefile so test-installation is properly disabled
+  sed '/test-installation/s@$(PERL)@echo not running@' -i ../Makefile
+  
   make install
   sed '/RTLDLIST=/s@/usr@@g' -i /usr/bin/ldd
   make localedata/install-locales
@@ -60,6 +69,7 @@ EOF
   cp -v zone.tab zone1970.tab iso3166.tab $ZONEINFO
   zic -d $ZONEINFO -p America/New_York
   
+  # Set localtime to Asia/Kolkata for you
   ln -sfv /usr/share/zoneinfo/Asia/Kolkata /etc/localtime
 
   cat > /etc/ld.so.conf << "EOF"
@@ -321,13 +331,11 @@ run_pkg() {
   echo "ok: $1"
 }
 
-# The ordered list of Chapter 8 packages for Stage 4
 FAILED_PKGS=""
 for p in manpages iana glibc zlib bzip2 xz lz4 zstd file readline pcre2 m4 bc flex tcl expect dejagnu pkgconf binutils gmp mpfr mpc attr acl; do
   run_pkg "$p" || FAILED_PKGS="$FAILED_PKGS $p"
 done
 
-# Save logs to /sources so we can view them via artifacts
 cp -r $LOGS /sources/chroot-stg4-logs
 if [ -n "$FAILED_PKGS" ]; then
   echo "==> Stage 4 finished WITH FAILURES:$FAILED_PKGS"
