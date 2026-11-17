@@ -28,7 +28,7 @@ pkg_glibc() {
   ../configure --prefix=/usr --disable-werror --disable-nscd libc_cv_slibdir=/usr/lib --enable-stack-protector=strong --enable-kernel=5.10
   make
   touch /etc/ld.so.conf
-  sed '/test-installation/s@$(PERL)@echo not running@' -i ../Makefile
+  sed '/test-installation/s@$(PERL)@echo not running@' -i ./Makefile
   make install
   sed '/RTLDLIST=/s@/usr@@g' -i /usr/bin/ldd
   make localedata/install-locales
